@@ -246,7 +246,6 @@
         }
     </style>
     <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;700&display=swap" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/persian-date@1.1.0/build/persian-date.min.js"></script>
 </head>
 <body>
     <div class="container">
@@ -339,17 +338,42 @@
             const generatedCode = document.getElementById('generated-code');
             const copyBtn = document.getElementById('copy-btn');
             
-            // تابع برای تبدیل تاریخ شمسی به میلادی
+            // تابع برای تبدیل تاریخ شمسی به میلادی بدون وابستگی به کتابخانه خارجی
             function shamsiToGregorian(shamsiDate) {
-                const dateParts = shamsiDate.split('/');
-                if (dateParts.length !== 3) return null;
-                
-                const year = parseInt(dateParts[0]);
-                const month = parseInt(dateParts[1]);
-                const day = parseInt(dateParts[2]);
-                
-                const gDate = new persianDate([year, month, day]).toCalendar('gregorian').toLocale('en').format('YYYY-MM-DD');
-                return gDate;
+                try {
+                    const dateParts = shamsiDate.split('/');
+                    if (dateParts.length !== 3) return null;
+                    
+                    const year = parseInt(dateParts[0]);
+                    const month = parseInt(dateParts[1]);
+                    const day = parseInt(dateParts[2]);
+                    
+                    if (isNaN(year) || isNaN(month) || isNaN(day)) {
+                        return null;
+                    }
+                    
+                    // الگوریتم تبدیل شمسی به میلادی
+                    const gDate = jalaliToGregorian(year, month, day);
+                    return `${gDate[0]}-${String(gDate[1]).padStart(2, '0')}-${String(gDate[2]).padStart(2, '0')}`;
+                } catch (error) {
+                    console.error('Error converting date:', error);
+                    return null;
+                }
+            }
+            
+            // الگوریتم تبدیل جلالی به میلادی
+            function jalaliToGregorian(jy, jm, jd) {
+                var gy = jy + 1595;
+                var days = -355668 + (365 * gy) + Math.floor(gy / 33) * 8 + Math.floor((gy % 33 + 3) / 4) + jd + (jm < 7 ? (jm - 1) * 31 : (jm - 7) * 30 + 186);
+                var gd = days % 365;
+                gy = Math.floor(days / 365);
+                if (gd < 0) {
+                    gd += 365;
+                    gy--;
+                }
+                var gm = (gd < 186) ? Math.floor(gd / 31) + 1 : Math.floor((gd - 186) / 30) + 7;
+                gd = (gd < 186) ? (gd % 31) + 1 : ((gd - 186) % 30) + 1;
+                return [gy, gm, gd];
             }
             
             // تابع برای ایجاد کد اجرایی
@@ -360,6 +384,44 @@
 // ======== کد مقایسه قیمت بلیط تهران - نجف ========
 // تاریخ: ${shamsiDate} (${gregorianDate})
 // تعداد مسافرین: ${passengers}
+
+// تابع برای تبدیل تاریخ شمسی به میلادی
+function shamsiToGregorian(shamsiDate) {
+    try {
+        const dateParts = shamsiDate.split('/');
+        if (dateParts.length !== 3) return null;
+        
+        const year = parseInt(dateParts[0]);
+        const month = parseInt(dateParts[1]);
+        const day = parseInt(dateParts[2]);
+        
+        if (isNaN(year) || isNaN(month) || isNaN(day)) {
+            return null;
+        }
+        
+        // الگوریتم تبدیل شمسی به میلادی
+        const gDate = jalaliToGregorian(year, month, day);
+        return \`\${gDate[0]}-\${String(gDate[1]).padStart(2, '0')}-\${String(gDate[2]).padStart(2, '0')}\`;
+    } catch (error) {
+        console.error('Error converting date:', error);
+        return null;
+    }
+}
+
+// الگوریتم تبدیل جلالی به میلادی
+function jalaliToGregorian(jy, jm, jd) {
+    var gy = jy + 1595;
+    var days = -355668 + (365 * gy) + Math.floor(gy / 33) * 8 + Math.floor((gy % 33 + 3) / 4) + jd + (jm < 7 ? (jm - 1) * 31 : (jm - 7) * 30 + 186);
+    var gd = days % 365;
+    gy = Math.floor(days / 365);
+    if (gd < 0) {
+        gd += 365;
+        gy--;
+    }
+    var gm = (gd < 186) ? Math.floor(gd / 31) + 1 : Math.floor((gd - 186) / 30) + 7;
+    gd = (gd < 186) ? (gd % 31) + 1 : ((gd - 186) % 30) + 1;
+    return [gy, gm, gd];
+}
 
 // تابع اصلی برای دریافت قیمت‌ها
 async function fetchFlightPrices() {
@@ -530,12 +592,18 @@ fetchFlightPrices().catch(error => {
                 
                 // تولید کد اجرایی
                 setTimeout(() => {
-                    const executableCode = generateExecutableCode(shamsiDate, passengers);
-                    generatedCode.textContent = executableCode;
-                    
-                    // نمایش کد
-                    loadingContainer.style.display = 'none';
-                    codeContainer.style.display = 'block';
+                    try {
+                        const executableCode = generateExecutableCode(shamsiDate, passengers);
+                        generatedCode.textContent = executableCode;
+                        
+                        // نمایش کد
+                        loadingContainer.style.display = 'none';
+                        codeContainer.style.display = 'block';
+                    } catch (error) {
+                        console.error('Error generating code:', error);
+                        loadingContainer.style.display = 'none';
+                        alert('خطا در تولید کد اجرایی. لطفاً تاریخ را به درستی وارد کنید.');
+                    }
                 }, 1000);
             }
             
