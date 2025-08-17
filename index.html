@@ -165,28 +165,42 @@
             color: rgba(255, 255, 255, 0.7);
         }
         
-        .warning {
-            background: rgba(231, 76, 60, 0.2);
-            border: 1px solid #e74c3c;
-            border-radius: 8px;
-            padding: 15px;
-            margin: 20px 0;
-            text-align: center;
-        }
-        
         .date-display {
             text-align: center;
             font-size: 1.3rem;
             margin: 20px 0;
             color: #f9d342;
         }
+        
+        .server-status {
+            text-align: center;
+            padding: 10px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            font-weight: bold;
+        }
+        
+        .server-online {
+            background: rgba(46, 204, 113, 0.2);
+            border: 1px solid #2ecc71;
+            color: #2ecc71;
+        }
+        
+        .server-offline {
+            background: rgba(231, 76, 60, 0.2);
+            border: 1px solid #e74c3c;
+            color: #e74c3c;
+        }
     </style>
     <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;700&display=swap" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/persian-date@1.1.0/build/persian-date.min.js"></script>
 </head>
 <body>
     <div class="container">
         <h1>مقایسه قیمت بلیط تهران → نجف</h1>
+        
+        <div class="server-status" id="server-status">
+            در حال بررسی وضعیت سرور...
+        </div>
         
         <div class="search-form">
             <div class="form-group">
@@ -235,27 +249,29 @@
             const resultsContainer = document.getElementById('results');
             const loadingContainer = document.getElementById('loading');
             const dateDisplay = document.getElementById('date-display');
+            const serverStatus = document.getElementById('server-status');
             
-            // API endpoints برای سایت‌های ایرانی
-            const apiEndpoints = {
-                snapptrip: 'https://www.snapptrip.com/api/v1/flights/search',
-                mrbilit: 'https://mrbilit.com/api/v2/flights/search',
-                alibaba: 'https://www.alibaba.ir/api/v1/flights/search',
-                flytoday: 'https://www.flytoday.ir/api/v1/flights/search',
-                flightio: 'https://flightio.com/api/v2/flights/search'
-            };
+            // آدرس سرور واسط
+            const API_URL = 'http://localhost:3000/api/search-flights';
             
-            // تابع برای تبدیل تاریخ شمسی به میلادی
-            function shamsiToGregorian(shamsiDate) {
-                const dateParts = shamsiDate.split('/');
-                if (dateParts.length !== 3) return null;
-                
-                const year = parseInt(dateParts[0]);
-                const month = parseInt(dateParts[1]);
-                const day = parseInt(dateParts[2]);
-                
-                const gDate = new persianDate([year, month, day]).toCalendar('gregorian').toLocale('en').format('YYYY-MM-DD');
-                return gDate;
+            // بررسی وضعیت سرور
+            checkServerStatus();
+            
+            // تابع برای بررسی وضعیت سرور
+            async function checkServerStatus() {
+                try {
+                    const response = await fetch(API_URL.split('/api')[0]);
+                    if (response.ok) {
+                        serverStatus.textContent = 'سرور آنلاین است';
+                        serverStatus.className = 'server-status server-online';
+                    } else {
+                        throw new Error('Server offline');
+                    }
+                } catch (error) {
+                    serverStatus.textContent = 'سرور آفلاین است. لطفاً سرور را اجرا کنید.';
+                    serverStatus.className = 'server-status server-offline';
+                    searchBtn.disabled = true;
+                }
             }
             
             // تابع برای جستجوی قیمت‌ها
@@ -268,12 +284,6 @@
                     return;
                 }
                 
-                const gregorianDate = shamsiToGregorian(shamsiDate);
-                if (!gregorianDate) {
-                    alert('تاریخ وارد شده معتبر نیست. لطفاً از فرمت 1403/05/29 استفاده کنید');
-                    return;
-                }
-                
                 // نمایش تاریخ انتخاب شده
                 dateDisplay.textContent = `نتایج برای تاریخ ${shamsiDate}`;
                 
@@ -282,24 +292,17 @@
                 resultsContainer.style.display = 'none';
                 
                 try {
-                    // ایجاد درخواست‌ها برای تمام سایت‌ها به صورت موازی
-                    const requests = Object.entries(apiEndpoints).map(([site, url]) => 
-                        fetchFlightPrice(site, url, gregorianDate, passengers)
-                    );
+                    // ارسال درخواست به سرور واسط
+                    const response = await fetch(`${API_URL}?origin=THR&destination=NAJ&date=${shamsiDate}&passengers=${passengers}`);
                     
-                    // منتظر ماندن برای تمام درخواست‌ها
-                    const results = await Promise.allSettled(requests);
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
                     
-                    // پردازش نتایج
-                    const validResults = [];
-                    results.forEach((result, index) => {
-                        if (result.status === 'fulfilled' && result.value) {
-                            validResults.push(result.value);
-                        }
-                    });
+                    const results = await response.json();
                     
                     // نمایش نتایج
-                    displayResults(validResults);
+                    displayResults(results);
                     
                 } catch (error) {
                     console.error('Error fetching flight prices:', error);
@@ -308,76 +311,6 @@
                 } finally {
                     loadingContainer.style.display = 'none';
                 }
-            }
-            
-            // تابع برای دریافت قیمت از یک سایت خاص
-            async function fetchFlightPrice(site, url, date, passengers) {
-                try {
-                    // پارامترهای درخواست
-                    const params = new URLSearchParams({
-                        origin: 'THR',
-                        destination: 'NAJ',
-                        departureDate: date,
-                        adults: passengers,
-                        children: 0,
-                        infants: 0,
-                        cabinClass: 'Economy'
-                    });
-                    
-                    // ارسال درخواست
-                    const response = await fetch(`${url}?${params}`, {
-                        method: 'GET',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-                        }
-                    });
-                    
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
-                    }
-                    
-                    const data = await response.json();
-                    
-                    // استخراج قیمت از پاسخ (این بخش بسته به ساختار API هر سایت متفاوت است)
-                    let price = null;
-                    if (site === 'snapptrip' && data.data && data.data.flights && data.data.flights.length > 0) {
-                        price = Math.min(...data.data.flights.map(flight => flight.price.amount));
-                    } else if (site === 'mrbilit' && data.flights && data.flights.length > 0) {
-                        price = Math.min(...data.flights.map(flight => flight.price));
-                    } else if (site === 'alibaba' && data.result && data.result.flights && data.result.flights.length > 0) {
-                        price = Math.min(...data.result.flights.map(flight => flight.price));
-                    } else if (site === 'flytoday' && data.data && data.data.flights && data.data.flights.length > 0) {
-                        price = Math.min(...data.data.flights.map(flight => flight.price));
-                    } else if (site === 'flightio' && data.flights && data.flights.length > 0) {
-                        price = Math.min(...data.flights.map(flight => flight.price));
-                    }
-                    
-                    if (price) {
-                        return {
-                            site: site.charAt(0).toUpperCase() + site.slice(1),
-                            price: price,
-                            url: getSiteUrl(site)
-                        };
-                    }
-                    
-                    return null;
-                } catch (error) {
-                    console.error(`Error fetching from ${site}:`, error);
-                    return null;
-                }
-            }
-            
-            // تابع برای دریافت آدرس اصلی سایت
-            function getSiteUrl(site) {
-                const urls = {
-                    snapptrip: 'https://www.snapptrip.com/inter-flights',
-                    mrbilit: 'https://mrbilit.com/international-flights',
-                    alibaba: 'https://www.alibaba.ir/iranout',
-                    flytoday: 'https://www.flytoday.ir/',
-                    flightio: 'https://flightio.com/'
-                };
-                return urls[site] || '#';
             }
             
             // تابع برای نمایش نتایج
