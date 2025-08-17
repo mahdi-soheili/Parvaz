@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>مقایسه قیمت بلیط تهران - نجف</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Vazirmatn', sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #1a2a6c, #b21f1f, #1a2a6c);
+            color: white;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: rgba(0, 0, 0, 0.7);
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        }
+        
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5rem;
+            color: #f9d342;
+            text-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+        }
+        
+        .date-selector {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+        
+        .date-btn {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 30px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            font-weight: bold;
+        }
+        
+        .date-btn:hover {
+            background: #2980b9;
+            transform: translateY(-3px);
+        }
+        
+        .date-btn.active {
+            background: #e74c3c;
+        }
+        
+        .loading {
+            text-align: center;
+            margin: 40px 0;
+            font-size: 1.2rem;
+        }
+        
+        .spinner {
+            border: 5px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top: 5px solid #f9d342;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .results {
+            display: none;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 25px;
+            margin-top: 30px;
+        }
+        
+        .result-item {
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        
+        .result-site {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #3498db;
+        }
+        
+        .result-price {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: #2ecc71;
+        }
+        
+        .cheapest {
+            background: rgba(46, 204, 113, 0.2);
+            border: 2px solid #2ecc71;
+        }
+        
+        .cheapest .result-price {
+            color: #f9d342;
+            font-size: 2.2rem;
+        }
+        
+        .no-results {
+            text-align: center;
+            font-size: 1.3rem;
+            color: #e74c3c;
+            margin: 30px 0;
+        }
+        
+        .footer {
+            text-align: center;
+            margin-top: 40px;
+            font-size: 0.9rem;
+            color: rgba(255, 255, 255, 0.7);
+        }
+        
+        .warning {
+            background: rgba(231, 76, 60, 0.2);
+            border: 1px solid #e74c3c;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 20px 0;
+            text-align: center;
+        }
+    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <h1>مقایسه قیمت بلیط تهران → نجف</h1>
+        
+        <div class="date-selector">
+            <button class="date-btn active" data-date="1403-06-29">۲۹ مرداد</button>
+            <button class="date-btn" data-date="1403-06-30">۳۰ مرداد</button>
+            <button class="date-btn" data-date="1403-06-31">۳۱ مرداد</button>
+        </div>
+        
+        <div class="warning">
+            توجه: به دلیل محدودیت‌های فنی، این صفحه به صورت شبیه‌سازی کار می‌کند. برای دریافت قیمت‌های واقعی، لطفاً به سایت‌های مراجعه کنید.
+        </div>
+        
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            در حال بررسی قیمت‌ها...
+        </div>
+        
+        <div class="results" id="results">
+            <!-- نتایج اینجا نمایش داده می‌شوند -->
+        </div>
+        
+        <div class="footer">
+            طراحی شده با ❤️ برای شما | یا علی
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const dateButtons = document.querySelectorAll('.date-btn');
+            const resultsContainer = document.getElementById('results');
+            const loadingContainer = document.getElementById('loading');
+            
+            // شبیه‌سازی قیمت‌ها (در نسخه واقعی باید از API استفاده شود)
+            const simulatedPrices = {
+                "1403-06-29": [
+                    { site: "SnappTrip", price: 3200000, url: "https://www.snapptrip.com/inter-flights" },
+                    { site: "MrBilit", price: 3150000, url: "https://mrbilit.com/international-flights" },
+                    { site: "Alibaba", price: 3300000, url: "https://www.alibaba.ir/iranout" },
+                    { site: "FlyToday", price: 3250000, url: "https://www.flytoday.ir/" },
+                    { site: "Flightio", price: 3100000, url: "https://flightio.com/" }
+                ],
+                "1403-06-30": [
+                    { site: "SnappTrip", price: 3400000, url: "https://www.snapptrip.com/inter-flights" },
+                    { site: "MrBilit", price: 3350000, url: "https://mrbilit.com/international-flights" },
+                    { site: "Alibaba", price: 3450000, url: "https://www.alibaba.ir/iranout" },
+                    { site: "FlyToday", price: 3500000, url: "https://www.flytoday.ir/" },
+                    { site: "Flightio", price: 3300000, url: "https://flightio.com/" }
+                ],
+                "1403-06-31": [
+                    { site: "SnappTrip", price: 3600000, url: "https://www.snapptrip.com/inter-flights" },
+                    { site: "MrBilit", price: 3550000, url: "https://mrbilit.com/international-flights" },
+                    { site: "Alibaba", price: 3650000, url: "https://www.alibaba.ir/iranout" },
+                    { site: "FlyToday", price: 3700000, url: "https://www.flytoday.ir/" },
+                    { site: "Flightio", price: 3500000, url: "https://flightio.com/" }
+                ]
+            };
+            
+            // تابع برای نمایش نتایج
+            function showResults(date) {
+                loadingContainer.style.display = 'block';
+                resultsContainer.style.display = 'none';
+                
+                // شبیه‌سازی تاخیر در دریافت اطلاعات
+                setTimeout(() => {
+                    const prices = simulatedPrices[date];
+                    if (!prices || prices.length === 0) {
+                        resultsContainer.innerHTML = '<div class="no-results">هیچ پروازی برای این تاریخ یافت نشد!</div>';
+                    } else {
+                        // پیدا کردن ارزان‌ترین قیمت
+                        const cheapestPrice = Math.min(...prices.map(item => item.price));
+                        
+                        let resultsHTML = '';
+                        prices.forEach(item => {
+                            const isCheapest = item.price === cheapestPrice;
+                            resultsHTML += `
+                                <div class="result-item ${isCheapest ? 'cheapest' : ''}">
+                                    <div class="result-site">${item.site}</div>
+                                    <div class="result-price">${item.price.toLocaleString('fa-IR')} تومان</div>
+                                    <a href="${item.url}" target="_blank" style="color: #3498db; text-decoration: none;">مشاهده سایت</a>
+                                </div>
+                            `;
+                        });
+                        
+                        resultsContainer.innerHTML = resultsHTML;
+                    }
+                    
+                    loadingContainer.style.display = 'none';
+                    resultsContainer.style.display = 'block';
+                }, 1500);
+            }
+            
+            // رویداد کلیک برای دکمه‌های تاریخ
+            dateButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    dateButtons.forEach(btn => btn.classList.remove('active'));
+                    this.classList.add('active');
+                    
+                    const selectedDate = this.getAttribute('data-date');
+                    showResults(selectedDate);
+                });
+            });
+            
+            // نمایش نتایج برای تاریخ پیش‌فرض
+            showResults('1403-06-29');
+        });
+    </script>
+</body>
+</html>
