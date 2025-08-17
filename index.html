@@ -172,34 +172,96 @@
             color: #f9d342;
         }
         
-        .server-status {
+        .instructions {
+            background: rgba(52, 152, 219, 0.2);
+            border: 1px solid #3498db;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 20px 0;
+            text-align: center;
+        }
+        
+        .instructions h3 {
+            color: #3498db;
+            margin-bottom: 10px;
+        }
+        
+        .instructions ol {
+            text-align: right;
+            direction: rtl;
+            margin-right: 20px;
+        }
+        
+        .instructions li {
+            margin-bottom: 8px;
+        }
+        
+        .code-block {
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+            font-family: monospace;
+            text-align: left;
+            direction: ltr;
+            overflow-x: auto;
+            white-space: pre;
+            font-size: 0.9rem;
+            line-height: 1.4;
+        }
+        
+        .copy-btn {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            margin-top: 10px;
+        }
+        
+        .copy-btn:hover {
+            background: #2980b9;
+        }
+        
+        .status-message {
             text-align: center;
             padding: 10px;
-            margin-bottom: 20px;
+            margin: 15px 0;
             border-radius: 8px;
             font-weight: bold;
         }
         
-        .server-online {
+        .status-success {
             background: rgba(46, 204, 113, 0.2);
             border: 1px solid #2ecc71;
             color: #2ecc71;
         }
         
-        .server-offline {
+        .status-error {
             background: rgba(231, 76, 60, 0.2);
             border: 1px solid #e74c3c;
             color: #e74c3c;
         }
     </style>
     <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/persian-date@1.1.0/build/persian-date.min.js"></script>
 </head>
 <body>
     <div class="container">
         <h1>مقایسه قیمت بلیط تهران → نجف</h1>
         
-        <div class="server-status" id="server-status">
-            در حال بررسی وضعیت سرور...
+        <div class="instructions">
+            <h3>راهنمای استفاده:</h3>
+            <ol>
+                <li>تاریخ پرواز را به فرمت شمسی وارد کنید (مثال: 1403/05/29)</li>
+                <li>روی دکمه "جستجوی قیمت‌ها" کلیک کنید</li>
+                <li>کد تولید شده را کپی کنید</li>
+                <li>کنسول مرورگر را باز کنید (F12 یا Ctrl+Shift+I)</li>
+                <li>کد را در کنسول چسبانده و Enter را بزنید</li>
+                <li>منتظر بمانید تا نتایج نمایش داده شوند</li>
+            </ol>
         </div>
         
         <div class="search-form">
@@ -228,7 +290,31 @@
         
         <div class="loading" id="loading">
             <div class="spinner"></div>
-            در حال بررسی قیمت‌ها از سایت‌های ایرانی...
+            در حال تولید کد اجرایی...
+        </div>
+        
+        <div id="code-container" style="display: none;">
+            <div class="status-message status-success">
+                کد اجرایی با موفقیت تولید شد! لطفاً مراحل زیر را انجام دهید:
+            </div>
+            
+            <div class="code-block" id="generated-code"></div>
+            
+            <div style="text-align: center;">
+                <button class="copy-btn" id="copy-btn">کپی کد</button>
+            </div>
+            
+            <div class="instructions">
+                <h3>مراحل اجرای کد:</h3>
+                <ol>
+                    <li>روی دکمه "کپی کد" کلیک کنید</li>
+                    <li>کنسول مرورگر را باز کنید (F12 یا Ctrl+Shift+I)</li>
+                    <li>به تب Console بروید</li>
+                    <li>کد را در کنسول چسبانده (Ctrl+V)</li>
+                    <li>Enter را فشار دهید</li>
+                    <li>منتظر بمانید تا نتایج نمایش داده شوند</li>
+                </ol>
+            </div>
         </div>
         
         <div class="results" id="results">
@@ -249,33 +335,183 @@
             const resultsContainer = document.getElementById('results');
             const loadingContainer = document.getElementById('loading');
             const dateDisplay = document.getElementById('date-display');
-            const serverStatus = document.getElementById('server-status');
+            const codeContainer = document.getElementById('code-container');
+            const generatedCode = document.getElementById('generated-code');
+            const copyBtn = document.getElementById('copy-btn');
             
-            // آدرس سرور واسط
-            const API_URL = 'http://localhost:3000/api/search-flights';
+            // تابع برای تبدیل تاریخ شمسی به میلادی
+            function shamsiToGregorian(shamsiDate) {
+                const dateParts = shamsiDate.split('/');
+                if (dateParts.length !== 3) return null;
+                
+                const year = parseInt(dateParts[0]);
+                const month = parseInt(dateParts[1]);
+                const day = parseInt(dateParts[2]);
+                
+                const gDate = new persianDate([year, month, day]).toCalendar('gregorian').toLocale('en').format('YYYY-MM-DD');
+                return gDate;
+            }
             
-            // بررسی وضعیت سرور
-            checkServerStatus();
-            
-            // تابع برای بررسی وضعیت سرور
-            async function checkServerStatus() {
-                try {
-                    const response = await fetch(API_URL.split('/api')[0]);
-                    if (response.ok) {
-                        serverStatus.textContent = 'سرور آنلاین است';
-                        serverStatus.className = 'server-status server-online';
-                    } else {
-                        throw new Error('Server offline');
-                    }
-                } catch (error) {
-                    serverStatus.textContent = 'سرور آفلاین است. لطفاً سرور را اجرا کنید.';
-                    serverStatus.className = 'server-status server-offline';
-                    searchBtn.disabled = true;
+            // تابع برای ایجاد کد اجرایی
+            function generateExecutableCode(shamsiDate, passengers) {
+                const gregorianDate = shamsiToGregorian(shamsiDate);
+                
+                return `
+// ======== کد مقایسه قیمت بلیط تهران - نجف ========
+// تاریخ: ${shamsiDate} (${gregorianDate})
+// تعداد مسافرین: ${passengers}
+
+// تابع اصلی برای دریافت قیمت‌ها
+async function fetchFlightPrices() {
+    console.log('%cدر حال دریافت قیمت‌ها از سایت‌های ایرانی...', 'color: #3498db; font-size: 14px; font-weight: bold;');
+    
+    const results = [];
+    
+    // سایت‌ها و آدرس‌های API آنها
+    const sites = [
+        { 
+            name: 'SnappTrip', 
+            url: 'https://www.snapptrip.com/api/v1/flights/search',
+            extractPrice: (data) => {
+                if (data.data?.flights?.length > 0) {
+                    return Math.min(...data.data.flights.map(f => f.price.amount));
                 }
+                return null;
+            }
+        },
+        { 
+            name: 'MrBilit', 
+            url: 'https://mrbilit.com/api/v2/flights/search',
+            extractPrice: (data) => {
+                if (data.flights?.length > 0) {
+                    return Math.min(...data.flights.map(f => f.price));
+                }
+                return null;
+            }
+        },
+        { 
+            name: 'Alibaba', 
+            url: 'https://www.alibaba.ir/api/v1/flights/search',
+            extractPrice: (data) => {
+                if (data.result?.flights?.length > 0) {
+                    return Math.min(...data.result.flights.map(f => f.price));
+                }
+                return null;
+            }
+        },
+        { 
+            name: 'FlyToday', 
+            url: 'https://www.flytoday.ir/api/v1/flights/search',
+            extractPrice: (data) => {
+                if (data.data?.flights?.length > 0) {
+                    return Math.min(...data.data.flights.map(f => f.price));
+                }
+                return null;
+            }
+        },
+        { 
+            name: 'Flightio', 
+            url: 'https://flightio.com/api/v2/flights/search',
+            extractPrice: (data) => {
+                if (data.flights?.length > 0) {
+                    return Math.min(...data.flights.map(f => f.price));
+                }
+                return null;
+            }
+        }
+    ];
+    
+    // پارامترهای درخواست
+    const params = new URLSearchParams({
+        origin: 'THR',
+        destination: 'NAJ',
+        departureDate: '${gregorianDate}',
+        adults: ${passengers},
+        children: 0,
+        infants: 0,
+        cabinClass: 'Economy'
+    });
+    
+    // ارسال درخواست به تمام سایت‌ها
+    for (const site of sites) {
+        try {
+            console.log(\`%cدر حال دریافت اطلاعات از \${site.name}...\`, 'color: #f39c12;');
+            
+            // استفاده از fetch برای ارسال درخواست
+            const response = await fetch(\`\${site.url}?\${params}\`, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+                    'Accept': 'application/json',
+                    'Accept-Language': 'fa-IR,fa;q=0.9,en-US;q=0.8,en;q=0.7',
+                    'Cache-Control': 'no-cache',
+                    'Pragma': 'no-cache'
+                },
+                mode: 'cors',
+                credentials: 'omit'
+            });
+            
+            if (!response.ok) {
+                throw new Error(\`HTTP error! status: \${response.status}\`);
+            }
+            
+            const data = await response.json();
+            
+            // استخراج قیمت از پاسخ
+            const price = site.extractPrice(data);
+            
+            if (price) {
+                results.push({
+                    site: site.name,
+                    price: price,
+                    url: site.url.replace('/api', '')
+                });
+                console.log(\`%cقیمت از \${site.name}: \${price.toLocaleString('fa-IR')} تومان\`, 'color: #2ecc71;');
+            } else {
+                console.log(\`%cهیچ پروازی در \${site.name} یافت نشد\`, 'color: #e74c3c;');
+            }
+        } catch (error) {
+            console.error(\`%cخطا در دریافت اطلاعات از \${site.name}:\`, 'color: #e74c3c;', error.message);
+        }
+    }
+    
+    // نمایش نتایج نهایی
+    console.log('%c===== نتایج نهایی =====', 'color: #3498db; font-size: 16px; font-weight: bold;');
+    
+    if (results.length === 0) {
+        console.log('%cهیچ پروازی برای این تاریخ یافت نشد!', 'color: #e74c3c; font-size: 14px; font-weight: bold;');
+    } else {
+        // پیدا کردن ارزان‌ترین قیمت
+        const cheapestPrice = Math.min(...results.map(item => item.price));
+        
+        results.forEach(item => {
+            const isCheapest = item.price === cheapestPrice;
+            console.log(\`\${item.site}: \${item.price.toLocaleString('fa-IR')} تومان \${isCheapest ? '%c(ارزان‌ترین)' : ''}\`, isCheapest ? 'color: #f1c40f; font-weight: bold;' : '');
+        });
+        
+        console.log(\`%c\\nارزان‌ترین قیمت: \${cheapestPrice.toLocaleString('fa-IR')} تومان\`, 'color: #2ecc71; font-size: 14px; font-weight: bold;');
+    }
+    
+    // ارسال نتایج به صفحه اصلی
+    window.postMessage({ 
+        type: 'flightResults', 
+        results: results,
+        date: '${shamsiDate}'
+    }, '*');
+    
+    return results;
+}
+
+// اجرای تابع
+fetchFlightPrices().catch(error => {
+    console.error('%cخطا در اجرای تابع:', 'color: #e74c3c; font-weight: bold;', error);
+});
+                `;
             }
             
             // تابع برای جستجوی قیمت‌ها
-            async function searchFlights() {
+            function searchFlights() {
                 const shamsiDate = dateInput.value.trim();
                 const passengers = parseInt(passengersInput.value);
                 
@@ -289,59 +525,80 @@
                 
                 // نمایش لودینگ
                 loadingContainer.style.display = 'block';
+                codeContainer.style.display = 'none';
                 resultsContainer.style.display = 'none';
                 
-                try {
-                    // ارسال درخواست به سرور واسط
-                    const response = await fetch(`${API_URL}?origin=THR&destination=NAJ&date=${shamsiDate}&passengers=${passengers}`);
+                // تولید کد اجرایی
+                setTimeout(() => {
+                    const executableCode = generateExecutableCode(shamsiDate, passengers);
+                    generatedCode.textContent = executableCode;
                     
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
-                    }
-                    
-                    const results = await response.json();
-                    
-                    // نمایش نتایج
-                    displayResults(results);
-                    
-                } catch (error) {
-                    console.error('Error fetching flight prices:', error);
-                    resultsContainer.innerHTML = '<div class="no-results">خطا در دریافت اطلاعات. لطفاً دوباره تلاش کنید.</div>';
-                    resultsContainer.style.display = 'block';
-                } finally {
+                    // نمایش کد
                     loadingContainer.style.display = 'none';
-                }
+                    codeContainer.style.display = 'block';
+                }, 1000);
             }
             
-            // تابع برای نمایش نتایج
-            function displayResults(results) {
-                if (results.length === 0) {
-                    resultsContainer.innerHTML = '<div class="no-results">هیچ پروازی برای این تاریخ یافت نشد!</div>';
-                    resultsContainer.style.display = 'block';
-                    return;
-                }
-                
-                // پیدا کردن ارزان‌ترین قیمت
-                const cheapestPrice = Math.min(...results.map(item => item.price));
-                
-                let resultsHTML = '';
-                results.forEach(item => {
-                    const isCheapest = item.price === cheapestPrice;
-                    resultsHTML += `
-                        <div class="result-item ${isCheapest ? 'cheapest' : ''}">
-                            <div class="result-site">${item.site}</div>
-                            <div class="result-price">${item.price.toLocaleString('fa-IR')} تومان</div>
-                            <a href="${item.url}" target="_blank" style="color: #3498db; text-decoration: none;">مشاهده سایت</a>
-                        </div>
-                    `;
-                });
-                
-                resultsContainer.innerHTML = resultsHTML;
-                resultsContainer.style.display = 'block';
+            // تابع برای کپی کردن کد
+            function copyCode() {
+                const codeText = generatedCode.textContent;
+                navigator.clipboard.writeText(codeText)
+                    .then(() => {
+                        const originalText = copyBtn.textContent;
+                        copyBtn.textContent = 'کپی شد!';
+                        copyBtn.style.background = '#2ecc71';
+                        
+                        setTimeout(() => {
+                            copyBtn.textContent = originalText;
+                            copyBtn.style.background = '#3498db';
+                        }, 2000);
+                    })
+                    .catch(err => {
+                        console.error('خطا در کپی کردن کد:', err);
+                        alert('خطا در کپی کردن کد. لطفاً به صورت دستی کپی کنید.');
+                    });
             }
+            
+            // گوش دادن به پیام‌های از کنسول
+            window.addEventListener('message', function(event) {
+                if (event.data.type === 'flightResults') {
+                    const results = event.data.results;
+                    const date = event.data.date;
+                    
+                    // به‌روزرسانی تاریخ نمایش
+                    dateDisplay.textContent = `نتایج برای تاریخ ${date}`;
+                    
+                    if (results.length === 0) {
+                        resultsContainer.innerHTML = '<div class="no-results">هیچ پروازی برای این تاریخ یافت نشد!</div>';
+                    } else {
+                        // پیدا کردن ارزان‌ترین قیمت
+                        const cheapestPrice = Math.min(...results.map(item => item.price));
+                        
+                        let resultsHTML = '';
+                        results.forEach(item => {
+                            const isCheapest = item.price === cheapestPrice;
+                            resultsHTML += `
+                                <div class="result-item ${isCheapest ? 'cheapest' : ''}">
+                                    <div class="result-site">${item.site}</div>
+                                    <div class="result-price">${item.price.toLocaleString('fa-IR')} تومان</div>
+                                    <a href="${item.url}" target="_blank" style="color: #3498db; text-decoration: none;">مشاهده سایت</a>
+                                </div>
+                            `;
+                        });
+                        
+                        resultsContainer.innerHTML = resultsHTML;
+                    }
+                    
+                    resultsContainer.style.display = 'block';
+                    codeContainer.style.display = 'none';
+                }
+            });
             
             // رویداد کلیک برای دکمه جستجو
             searchBtn.addEventListener('click', searchFlights);
+            
+            // رویداد کلیک برای دکمه کپی
+            copyBtn.addEventListener('click', copyCode);
             
             // رویداد فشردن کلید Enter در فیلد تاریخ
             dateInput.addEventListener('keypress', function(e) {
