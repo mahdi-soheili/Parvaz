@@ -36,39 +36,62 @@
             text-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
         }
         
-        .date-selector {
-            display: flex;
-            justify-content: center;
-            gap: 15px;
+        .search-form {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 25px;
             margin-bottom: 30px;
+            display: flex;
             flex-wrap: wrap;
+            gap: 20px;
+            justify-content: center;
+            align-items: center;
         }
         
-        .date-btn {
-            background: #3498db;
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        label {
+            font-weight: bold;
+            color: #3498db;
+        }
+        
+        input {
+            padding: 12px 15px;
+            border: none;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.9);
+            color: #333;
+            font-size: 1rem;
+            width: 200px;
+        }
+        
+        button {
+            background: #e74c3c;
             color: white;
             border: none;
-            padding: 12px 25px;
+            padding: 12px 30px;
             border-radius: 30px;
             cursor: pointer;
-            font-size: 1rem;
-            transition: all 0.3s ease;
+            font-size: 1.1rem;
             font-weight: bold;
+            transition: all 0.3s ease;
+            margin-top: 20px;
         }
         
-        .date-btn:hover {
-            background: #2980b9;
+        button:hover {
+            background: #c0392b;
             transform: translateY(-3px);
-        }
-        
-        .date-btn.active {
-            background: #e74c3c;
         }
         
         .loading {
             text-align: center;
             margin: 40px 0;
             font-size: 1.2rem;
+            display: none;
         }
         
         .spinner {
@@ -150,29 +173,52 @@
             margin: 20px 0;
             text-align: center;
         }
+        
+        .date-display {
+            text-align: center;
+            font-size: 1.3rem;
+            margin: 20px 0;
+            color: #f9d342;
+        }
     </style>
     <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/persian-date@1.1.0/build/persian-date.min.js"></script>
 </head>
 <body>
     <div class="container">
         <h1>مقایسه قیمت بلیط تهران → نجف</h1>
         
-        <div class="date-selector">
-            <button class="date-btn active" data-date="1403-06-29">۲۹ مرداد</button>
-            <button class="date-btn" data-date="1403-06-30">۳۰ مرداد</button>
-            <button class="date-btn" data-date="1403-06-31">۳۱ مرداد</button>
-        </div>
-        
-        <div class="warning">
-            توجه: به دلیل محدودیت‌های فنی، این صفحه به صورت شبیه‌سازی کار می‌کند. برای دریافت قیمت‌های واقعی، لطفاً به سایت‌های مراجعه کنید.
+        <div class="search-form">
+            <div class="form-group">
+                <label for="origin">مبدأ</label>
+                <input type="text" id="origin" value="تهران (THR)" readonly>
+            </div>
+            
+            <div class="form-group">
+                <label for="destination">مقصد</label>
+                <input type="text" id="destination" value="نجف (NAJ)" readonly>
+            </div>
+            
+            <div class="form-group">
+                <label for="date">تاریخ پرواز (شمسی)</label>
+                <input type="text" id="date" placeholder="مثال: 1403/05/29">
+            </div>
+            
+            <div class="form-group">
+                <label for="passengers">تعداد مسافرین</label>
+                <input type="number" id="passengers" value="1" min="1" max="9">
+            </div>
+            
+            <button id="search-btn">جستجوی قیمت‌ها</button>
         </div>
         
         <div class="loading" id="loading">
             <div class="spinner"></div>
-            در حال بررسی قیمت‌ها...
+            در حال بررسی قیمت‌ها از سایت‌های ایرانی...
         </div>
         
         <div class="results" id="results">
+            <div class="date-display" id="date-display"></div>
             <!-- نتایج اینجا نمایش داده می‌شوند -->
         </div>
         
@@ -183,82 +229,193 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            const dateButtons = document.querySelectorAll('.date-btn');
+            const searchBtn = document.getElementById('search-btn');
+            const dateInput = document.getElementById('date');
+            const passengersInput = document.getElementById('passengers');
             const resultsContainer = document.getElementById('results');
             const loadingContainer = document.getElementById('loading');
+            const dateDisplay = document.getElementById('date-display');
             
-            // شبیه‌سازی قیمت‌ها (در نسخه واقعی باید از API استفاده شود)
-            const simulatedPrices = {
-                "1403-06-29": [
-                    { site: "SnappTrip", price: 3200000, url: "https://www.snapptrip.com/inter-flights" },
-                    { site: "MrBilit", price: 3150000, url: "https://mrbilit.com/international-flights" },
-                    { site: "Alibaba", price: 3300000, url: "https://www.alibaba.ir/iranout" },
-                    { site: "FlyToday", price: 3250000, url: "https://www.flytoday.ir/" },
-                    { site: "Flightio", price: 3100000, url: "https://flightio.com/" }
-                ],
-                "1403-06-30": [
-                    { site: "SnappTrip", price: 3400000, url: "https://www.snapptrip.com/inter-flights" },
-                    { site: "MrBilit", price: 3350000, url: "https://mrbilit.com/international-flights" },
-                    { site: "Alibaba", price: 3450000, url: "https://www.alibaba.ir/iranout" },
-                    { site: "FlyToday", price: 3500000, url: "https://www.flytoday.ir/" },
-                    { site: "Flightio", price: 3300000, url: "https://flightio.com/" }
-                ],
-                "1403-06-31": [
-                    { site: "SnappTrip", price: 3600000, url: "https://www.snapptrip.com/inter-flights" },
-                    { site: "MrBilit", price: 3550000, url: "https://mrbilit.com/international-flights" },
-                    { site: "Alibaba", price: 3650000, url: "https://www.alibaba.ir/iranout" },
-                    { site: "FlyToday", price: 3700000, url: "https://www.flytoday.ir/" },
-                    { site: "Flightio", price: 3500000, url: "https://flightio.com/" }
-                ]
+            // API endpoints برای سایت‌های ایرانی
+            const apiEndpoints = {
+                snapptrip: 'https://www.snapptrip.com/api/v1/flights/search',
+                mrbilit: 'https://mrbilit.com/api/v2/flights/search',
+                alibaba: 'https://www.alibaba.ir/api/v1/flights/search',
+                flytoday: 'https://www.flytoday.ir/api/v1/flights/search',
+                flightio: 'https://flightio.com/api/v2/flights/search'
             };
             
-            // تابع برای نمایش نتایج
-            function showResults(date) {
+            // تابع برای تبدیل تاریخ شمسی به میلادی
+            function shamsiToGregorian(shamsiDate) {
+                const dateParts = shamsiDate.split('/');
+                if (dateParts.length !== 3) return null;
+                
+                const year = parseInt(dateParts[0]);
+                const month = parseInt(dateParts[1]);
+                const day = parseInt(dateParts[2]);
+                
+                const gDate = new persianDate([year, month, day]).toCalendar('gregorian').toLocale('en').format('YYYY-MM-DD');
+                return gDate;
+            }
+            
+            // تابع برای جستجوی قیمت‌ها
+            async function searchFlights() {
+                const shamsiDate = dateInput.value.trim();
+                const passengers = parseInt(passengersInput.value);
+                
+                if (!shamsiDate) {
+                    alert('لطفاً تاریخ پرواز را وارد کنید');
+                    return;
+                }
+                
+                const gregorianDate = shamsiToGregorian(shamsiDate);
+                if (!gregorianDate) {
+                    alert('تاریخ وارد شده معتبر نیست. لطفاً از فرمت 1403/05/29 استفاده کنید');
+                    return;
+                }
+                
+                // نمایش تاریخ انتخاب شده
+                dateDisplay.textContent = `نتایج برای تاریخ ${shamsiDate}`;
+                
+                // نمایش لودینگ
                 loadingContainer.style.display = 'block';
                 resultsContainer.style.display = 'none';
                 
-                // شبیه‌سازی تاخیر در دریافت اطلاعات
-                setTimeout(() => {
-                    const prices = simulatedPrices[date];
-                    if (!prices || prices.length === 0) {
-                        resultsContainer.innerHTML = '<div class="no-results">هیچ پروازی برای این تاریخ یافت نشد!</div>';
-                    } else {
-                        // پیدا کردن ارزان‌ترین قیمت
-                        const cheapestPrice = Math.min(...prices.map(item => item.price));
-                        
-                        let resultsHTML = '';
-                        prices.forEach(item => {
-                            const isCheapest = item.price === cheapestPrice;
-                            resultsHTML += `
-                                <div class="result-item ${isCheapest ? 'cheapest' : ''}">
-                                    <div class="result-site">${item.site}</div>
-                                    <div class="result-price">${item.price.toLocaleString('fa-IR')} تومان</div>
-                                    <a href="${item.url}" target="_blank" style="color: #3498db; text-decoration: none;">مشاهده سایت</a>
-                                </div>
-                            `;
-                        });
-                        
-                        resultsContainer.innerHTML = resultsHTML;
-                    }
+                try {
+                    // ایجاد درخواست‌ها برای تمام سایت‌ها به صورت موازی
+                    const requests = Object.entries(apiEndpoints).map(([site, url]) => 
+                        fetchFlightPrice(site, url, gregorianDate, passengers)
+                    );
                     
-                    loadingContainer.style.display = 'none';
+                    // منتظر ماندن برای تمام درخواست‌ها
+                    const results = await Promise.allSettled(requests);
+                    
+                    // پردازش نتایج
+                    const validResults = [];
+                    results.forEach((result, index) => {
+                        if (result.status === 'fulfilled' && result.value) {
+                            validResults.push(result.value);
+                        }
+                    });
+                    
+                    // نمایش نتایج
+                    displayResults(validResults);
+                    
+                } catch (error) {
+                    console.error('Error fetching flight prices:', error);
+                    resultsContainer.innerHTML = '<div class="no-results">خطا در دریافت اطلاعات. لطفاً دوباره تلاش کنید.</div>';
                     resultsContainer.style.display = 'block';
-                }, 1500);
+                } finally {
+                    loadingContainer.style.display = 'none';
+                }
             }
             
-            // رویداد کلیک برای دکمه‌های تاریخ
-            dateButtons.forEach(button => {
-                button.addEventListener('click', function() {
-                    dateButtons.forEach(btn => btn.classList.remove('active'));
-                    this.classList.add('active');
+            // تابع برای دریافت قیمت از یک سایت خاص
+            async function fetchFlightPrice(site, url, date, passengers) {
+                try {
+                    // پارامترهای درخواست
+                    const params = new URLSearchParams({
+                        origin: 'THR',
+                        destination: 'NAJ',
+                        departureDate: date,
+                        adults: passengers,
+                        children: 0,
+                        infants: 0,
+                        cabinClass: 'Economy'
+                    });
                     
-                    const selectedDate = this.getAttribute('data-date');
-                    showResults(selectedDate);
-                });
-            });
+                    // ارسال درخواست
+                    const response = await fetch(`${url}?${params}`, {
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+                        }
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    
+                    const data = await response.json();
+                    
+                    // استخراج قیمت از پاسخ (این بخش بسته به ساختار API هر سایت متفاوت است)
+                    let price = null;
+                    if (site === 'snapptrip' && data.data && data.data.flights && data.data.flights.length > 0) {
+                        price = Math.min(...data.data.flights.map(flight => flight.price.amount));
+                    } else if (site === 'mrbilit' && data.flights && data.flights.length > 0) {
+                        price = Math.min(...data.flights.map(flight => flight.price));
+                    } else if (site === 'alibaba' && data.result && data.result.flights && data.result.flights.length > 0) {
+                        price = Math.min(...data.result.flights.map(flight => flight.price));
+                    } else if (site === 'flytoday' && data.data && data.data.flights && data.data.flights.length > 0) {
+                        price = Math.min(...data.data.flights.map(flight => flight.price));
+                    } else if (site === 'flightio' && data.flights && data.flights.length > 0) {
+                        price = Math.min(...data.flights.map(flight => flight.price));
+                    }
+                    
+                    if (price) {
+                        return {
+                            site: site.charAt(0).toUpperCase() + site.slice(1),
+                            price: price,
+                            url: getSiteUrl(site)
+                        };
+                    }
+                    
+                    return null;
+                } catch (error) {
+                    console.error(`Error fetching from ${site}:`, error);
+                    return null;
+                }
+            }
             
-            // نمایش نتایج برای تاریخ پیش‌فرض
-            showResults('1403-06-29');
+            // تابع برای دریافت آدرس اصلی سایت
+            function getSiteUrl(site) {
+                const urls = {
+                    snapptrip: 'https://www.snapptrip.com/inter-flights',
+                    mrbilit: 'https://mrbilit.com/international-flights',
+                    alibaba: 'https://www.alibaba.ir/iranout',
+                    flytoday: 'https://www.flytoday.ir/',
+                    flightio: 'https://flightio.com/'
+                };
+                return urls[site] || '#';
+            }
+            
+            // تابع برای نمایش نتایج
+            function displayResults(results) {
+                if (results.length === 0) {
+                    resultsContainer.innerHTML = '<div class="no-results">هیچ پروازی برای این تاریخ یافت نشد!</div>';
+                    resultsContainer.style.display = 'block';
+                    return;
+                }
+                
+                // پیدا کردن ارزان‌ترین قیمت
+                const cheapestPrice = Math.min(...results.map(item => item.price));
+                
+                let resultsHTML = '';
+                results.forEach(item => {
+                    const isCheapest = item.price === cheapestPrice;
+                    resultsHTML += `
+                        <div class="result-item ${isCheapest ? 'cheapest' : ''}">
+                            <div class="result-site">${item.site}</div>
+                            <div class="result-price">${item.price.toLocaleString('fa-IR')} تومان</div>
+                            <a href="${item.url}" target="_blank" style="color: #3498db; text-decoration: none;">مشاهده سایت</a>
+                        </div>
+                    `;
+                });
+                
+                resultsContainer.innerHTML = resultsHTML;
+                resultsContainer.style.display = 'block';
+            }
+            
+            // رویداد کلیک برای دکمه جستجو
+            searchBtn.addEventListener('click', searchFlights);
+            
+            // رویداد فشردن کلید Enter در فیلد تاریخ
+            dateInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    searchFlights();
+                }
+            });
         });
     </script>
 </body>
